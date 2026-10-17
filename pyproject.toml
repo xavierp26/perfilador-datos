@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "perfilador-datos"
+dynamic = ["version"]
+description = "Perfilamiento y validación de calidad de archivos tabulares (CSV, TXT, Excel) con reporte HTML interactivo"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "Xavier Pimentel" }]
+dependencies = ["pandas>=1.1", "numpy", "openpyxl"]
+keywords = ["data-quality", "data-profiling", "psi", "eda", "pandas"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+
+[project.optional-dependencies]
+scipy = ["scipy"]   # valor crítico chi² exacto; sin scipy se usa la aproximación de Wilson-Hilferty
+
+[project.scripts]
+perfilador = "perfilador.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "perfilador._version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+perfilador = ["static/*.json", "static/*.html"]

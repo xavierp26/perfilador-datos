@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Perfilamiento de datos</title>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#f6f6f4; --surface:#fcfcfb; --surface-2:#f0efec; --border:#e2e1dc;
+  --text:#0b0b0b; --text-2:#52514e; --muted:#8a8984;
+  --grid:#e9e8e4; --axis:#b9b8b2;
+  --s1:#2a78d6; --s2:#eb6834;
+  --seq1:#cde2fb; --seq2:#9ec5f4; --seq3:#6da7ec; --seq4:#3987e5; --seq5:#256abf; --seq6:#184f95; --seq7:#0d366b;
+  --band-out:#cde2fb; --band-in:#86b6ef;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+  --empty:#f0efec;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --bg:#121211; --surface:#1a1a19; --surface-2:#242422; --border:#33332f;
+    --text:#f0efec; --text-2:#c3c2b7; --muted:#8f8e86;
+    --grid:#2b2b28; --axis:#55544f;
+    --s1:#3987e5; --s2:#d95926;
+    --seq1:#13294a; --seq2:#104281; --seq3:#184f95; --seq4:#256abf; --seq5:#3987e5; --seq6:#6da7ec; --seq7:#b7d3f6;
+    --band-out:#172c48; --band-in:#24497a;
+    --empty:#262624;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#121211; --surface:#1a1a19; --surface-2:#242422; --border:#33332f;
+  --text:#f0efec; --text-2:#c3c2b7; --muted:#8f8e86;
+  --grid:#2b2b28; --axis:#55544f;
+  --s1:#3987e5; --s2:#d95926;
+  --seq1:#13294a; --seq2:#104281; --seq3:#184f95; --seq4:#256abf; --seq5:#3987e5; --seq6:#6da7ec; --seq7:#b7d3f6;
+  --band-out:#172c48; --band-in:#24497a;
+  --empty:#262624;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:20px 24px 8px;max-width:1400px;margin:0 auto}
+h1{font-size:20px;margin:0 0 4px;font-weight:650;letter-spacing:-.01em}
+h2{font-size:15px;margin:0 0 10px;font-weight:620}
+h3{font-size:13px;margin:0 0 6px;font-weight:600;color:var(--text-2)}
+.sub{color:var(--text-2);font-size:13px}
+.sub code{background:var(--surface-2);padding:1px 5px;border-radius:4px;font-size:12px}
+main{max-width:1400px;margin:0 auto;padding:0 24px 40px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:14px 0}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.tile .k{font-size:12px;color:var(--text-2)}
+.tile .v{font-size:22px;font-weight:650;font-variant-numeric:tabular-nums}
+.tile .v small{font-size:12px;font-weight:500;color:var(--text-2)}
+nav{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border);margin:6px 0 14px;position:sticky;top:0;background:var(--bg);z-index:5;padding-top:6px}
+nav button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;color:var(--text-2);font:inherit;cursor:pointer}
+nav button.on{color:var(--text);border-bottom-color:var(--s1);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:900px){.row{grid-template-columns:1fr}}
+.tab{display:none}.tab.on{display:block}
+table{border-collapse:collapse;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums}
+th,td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+th{position:sticky;top:0;background:var(--surface);color:var(--text-2);font-weight:600;cursor:pointer;user-select:none}
+th:first-child,td:first-child,td.l,th.l{text-align:left}
+tr:hover td{background:var(--surface-2)}
+.tw{max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:8px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+select,input[type=search]{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:600;border:1px solid var(--border)}
+.pill i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text-2);margin:4px 0 8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.ln{width:16px;height:0;border-top:2px solid;display:inline-block}
+svg text{fill:var(--text-2);font-size:11px}
+svg .ax{stroke:var(--axis)} svg .gr{stroke:var(--grid)}
+#tt{position:fixed;pointer-events:none;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;box-shadow:0 4px 18px rgba(0,0,0,.14);display:none;z-index:50;max-width:340px}
+#tt b{font-weight:650}
+#tt .r{display:flex;justify-content:space-between;gap:14px}
+.heat{overflow:auto}
+.note{font-size:12px;color:var(--text-2);margin-top:6px}
+.btn{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer;font:inherit}
+.vn{cursor:pointer}.vn:hover{text-decoration:underline}
+.empty{color:var(--muted);padding:20px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+    <div>
+      <h1 id="titulo">Perfilamiento</h1>
+      <div class="sub" id="subt"></div>
+    </div>
+    <button class="btn" id="tema" title="Cambiar tema">◐ Tema</button>
+  </div>
+</header>
+<main>
+  <div class="tiles" id="tiles"></div>
+  <nav id="nav"></nav>
+
+  <section class="tab" id="t-resumen">
+    <div class="card"><h2>Alertas principales</h2><div id="al-top"></div></div>
+    <div class="card"><h2>Variables</h2>
+      <div class="controls"><input type="search" id="fvar" placeholder="Filtrar variable…"><span class="note">Clic en una variable para ver su detalle.</span></div>
+      <div class="tw" id="tvars"></div></div>
+  </section>
+
+  <section class="tab" id="t-volumen">
+    <div class="card"><h2>Filas por periodo</h2>
+      <div class="legend"><span><i class="sw" style="background:var(--s1)"></i>Filas</span><span><i class="sw" style="background:var(--crit)"></i>Periodo sin datos (hueco)</span></div>
+      <div id="ch-vol"></div>
+      <div class="note" id="vol-nota"></div></div>
+    <div class="row">
+      <div class="card"><h2>Volumen</h2><div class="tw" id="tvol"></div></div>
+      <div class="card"><h2>Duplicados de llave</h2><div class="tw" id="tuniq"></div></div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-psi">
+    <div class="card"><h2>PSI por variable y periodo</h2>
+      <div class="controls">
+        <label>Comparación <select id="psi-modo"></select></label>
+        <label>Orden <select id="psi-orden"><option value="max">PSI máximo</option><option value="nombre">Nombre</option></select></label>
+      </div>
+      <div class="legend" id="psi-leg"></div>
+      <div class="heat" id="hm-psi"></div>
+      <div class="note"><b>vs. periodo anterior</b> es el principal (el primer periodo queda vacío). <b>PSI-α</b> compara contra la distribución esperada configurada por variable. ● = estadísticamente significativo (PSI &gt; valor crítico, Yurdakul 2018). PSI alto sin ● suele ser ruido muestral con pocos registros; PSI bajo con ● en tablas grandes puede ser significativo pero irrelevante.</div></div>
+  </section>
+
+  <section class="tab" id="t-nulos">
+    <div class="card"><h2>% de nulos por variable y periodo</h2>
+      <div class="legend" id="nul-leg"></div>
+      <div class="heat" id="hm-nul"></div></div>
+  </section>
+
+  <section class="tab" id="t-variable">
+    <div class="card">
+      <div class="controls"><label>Variable <select id="selvar"></select></label><span id="var-info" class="sub"></span></div>
+      <div class="tiles" id="var-tiles"></div>
+    </div>
+    <div class="row">
+      <div class="card" id="c-dist"><h2 id="h-dist">Distribución en el tiempo</h2>
+        <div class="controls" id="dist-ctrl" style="display:none"><label>Vista <select id="dist-vista"><option value="cajas">Cajas (outliers)</option><option value="bandas">Bandas de percentiles</option></select></label><label>Eje <select id="dist-eje"><option value="p99">Acotado a p1–p99</option><option value="completo">Completo (hasta mín./máx.)</option><option value="log">Logarítmico</option></select></label></div>
+        <div class="legend" id="leg-dist"></div><div id="ch-dist"></div><div class="note" id="dist-nota"></div></div>
+      <div class="card"><h2>% nulos en el tiempo</h2><div id="ch-nul"></div></div>
+    </div>
+    <div class="row">
+      <div class="card"><h2>PSI en el tiempo</h2>
+        <div class="legend"><span><i class="sw" style="background:var(--s1)"></i>PSI vs. periodo anterior</span><span><i class="ln" style="border-color:var(--text-2);border-top-style:dashed"></i>valor crítico</span><span id="leg-alpha" style="display:none"><i class="ln" style="border-color:var(--s2)"></i>PSI-α (vs. esperado)</span><span><i class="ln" style="border-color:var(--warn)"></i>0.10</span><span><i class="ln" style="border-color:var(--crit)"></i>0.25</span></div>
+        <div id="ch-psi"></div></div>
+      <div class="card"><h2>Distribución por bucket</h2>
+        <div class="controls"><label>Periodo <select id="selper"></select></label><label>contra <select id="bins-modo"><option value="anterior">periodo anterior</option></select></label></div>
+        <div class="legend" id="leg-bins"></div>
+        <div id="ch-bins"></div></div>
+    </div>
+    <div class="card"><h2>Estadísticos por periodo</h2><div class="tw" id="tvarstats"></div></div>
+  </section>
+
+  <section class="tab" id="t-coherencia">
+    <div class="card"><h2>Outliers: % de valores fuera de Q1 − 3·IQR / Q3 + 3·IQR</h2>
+      <div class="legend" id="out-leg"></div>
+      <div class="heat" id="hm-out"></div>
+      <div class="note">Cercas fijadas con el periodo base. En variables de cola larga un % estable es esperable; lo relevante es que crezca. El tooltip muestra asimetría y curtosis.</div></div>
+    <div class="card"><h2>Reglas de negocio</h2>
+      <div class="tw" id="treglas"></div>
+      <div class="legend" id="reg-leg" style="margin-top:12px"></div>
+      <div class="heat" id="hm-reglas"></div></div>
+    <div class="row">
+      <div class="card"><h2>Valores centinela</h2><div class="tw" id="tcent"></div><div class="note">Un solo valor que concentra masa anómala: patrón de "sin dato" (−1, 999999, 19000101…) o el mínimo/máximo (tope o piso).</div></div>
+      <div class="card"><h2>Fechas</h2><div class="tw" id="tfechas"></div><div class="note">Futuras = posteriores al fin del periodo. Por defecto = 1900-01-01, 9999-12-31, 1970-01-01, etc.</div></div>
+    </div>
+    <div class="card"><h2>Texto y tipos</h2><div class="tw" id="ttexto"></div><div class="note">% sobre valores no nulos. "Distintos norm." = distintos tras UPPER(TRIM()); si baja, hay categorías que solo difieren en mayúsculas o espacios.</div></div>
+    <div class="row">
+      <div class="card"><h2>Cobertura de la llave entre periodos</h2>
+        <div class="legend"><span><i class="ln" style="border-color:var(--s1)"></i>% del periodo que ya estaba en el anterior</span><span><i class="ln" style="border-color:var(--s2)"></i>% del anterior que sigue</span></div>
+        <div id="ch-cob"></div></div>
+      <div class="card"><h2>Posibles cambios de régimen</h2><div class="tw" id="treg"></div><div class="note">Periodos donde varias variables cambian a la vez frente al anterior (PSI ≥ umbral moderado). Candidatos a corte de ventana; decide el científico.</div></div>
+    </div>
+    <div class="row">
+      <div class="card"><h2>Categorías nuevas y raras</h2><div class="tw" id="totros"></div></div>
+      <div class="card"><h2>Columnas idénticas</h2><div class="tw" id="tident"></div></div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-ficha">
+    <div class="card"><h2>Ficha por variable</h2>
+      <div class="controls"><label>Recomendación <select id="fic-rec"><option value="">Todas</option><option>usar</option><option>revisar</option><option>excluir (sugerido)</option><option>llave</option></select></label>
+      <span class="note">Sugerencias para el científico; el perfilador no excluye ni transforma nada.</span></div>
+      <div class="tw" id="tficha"></div></div>
+    <div class="card"><h2>Vista limpia propuesta (SQL)</h2>
+      <div class="controls"><button class="btn" id="copiar-sql">Copiar SQL</button><span class="note" id="sql-nota"></span></div>
+      <pre id="vsql" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;overflow:auto;max-height:520px;font-size:12px;line-height:1.5"></pre></div>
+  </section>
+
+  <section class="tab" id="t-alertas">
+    <div class="card"><h2>Alertas</h2>
+      <div class="controls"><label>Nivel <select id="al-nivel"><option value="">Todos</option><option>ALTA</option><option>MEDIA</option><option>INFO</option></select></label>
+      <label>Tipo <select id="al-tipo"><option value="">Todos</option></select></label></div>
+      <div class="tw" id="tal"></div></div>
+  </section>
+
+  <section class="tab" id="t-inventario">
+    <div class="card" id="c-lectura" style="display:none"><h2>Lectura del archivo</h2>
+      <div class="row"><div><h3>Estructura</h3><div class="tw" id="tlect"></div></div>
+      <div><h3>Inferencia de tipos</h3><div class="tw" id="tinfer"></div><div class="note">Todo se lee como texto y luego se infiere el tipo. Un código con ceros a la izquierda queda como texto para no corromperlo.</div></div></div></div>
+    <div class="card"><h2>Columnas</h2><div class="tw" id="tcols"></div></div>
+  </section>
+
+  <section class="tab" id="t-ejecucion">
+    <div class="card"><h2>Tareas</h2><div class="note" id="ej-nota"></div><div class="tw" id="ttareas"></div></div>
+    <div class="card"><h2>Parámetros</h2><div class="tw" id="tparams"></div></div>
+  </section>
+</main>
+<div id="tt"></div>
+<script>
+const D = /*__DATOS__*/null;
+const $ = s => document.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const lab = p => (D.etiquetas[p] || String(p));
+const fmt = (v, d) => {
+  if (v === null || v === undefined || (typeof v === "number" && !isFinite(v))) return "–";
+  if (typeof v !== "number") return String(v);
+  const a = Math.abs(v);
+  if (d !== undefined) return v.toLocaleString("es-GT", {minimumFractionDigits: d, maximumFractionDigits: d});
+  if (a >= 1e9) return (v/1e9).toLocaleString("es-GT",{maximumFractionDigits:2}) + " B";
+  if (a >= 1e6) return (v/1e6).toLocaleString("es-GT",{maximumFractionDigits:2}) + " M";
+  if (a >= 1e4) return v.toLocaleString("es-GT",{maximumFractionDigits:0});
+  if (a >= 1) return v.toLocaleString("es-GT",{maximumFractionDigits:2});
+  if (a === 0) return "0";
+  return v.toLocaleString("es-GT",{maximumSignificantDigits:3});
+};
+const pct = (v, d=1) => (v === null || v === undefined || !isFinite(v)) ? "–" : (v*100).toLocaleString("es-GT",{minimumFractionDigits:d,maximumFractionDigits:d}) + "%";
+function el(tag, attrs, parent){ const e = document.createElementNS(NS, tag); for (const k in (attrs||{})) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function h(tag, attrs, html){ const e = document.createElement(tag); for (const k in (attrs||{})) e.setAttribute(k, attrs[k]); if (html !== undefined) e.innerHTML = html; return e; }
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// ---------------------------------------------------------------- tooltip
+const tt = $("#tt");
+function showTT(ev, html){ tt.innerHTML = html; tt.style.display = "block"; moveTT(ev); }
+function moveTT(ev){ const w = tt.offsetWidth, hgt = tt.offsetHeight; let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + w > innerWidth - 8) x = ev.clientX - w - 14; if (y + hgt > innerHeight - 8) y = ev.clientY - hgt - 14; tt.style.left = x + "px"; tt.style.top = y + "px"; }
+function hideTT(){ tt.style.display = "none"; }
+const ttRow = (k, v) => `<div class="r"><span>${k}</span><b>${v}</b></div>`;
+
+// ---------------------------------------------------------------- status PSI
+function psiNivel(v){ const u = D.meta.umbrales; if (v === null || v === undefined || !isFinite(v)) return null;
+  return v >= u.psi_alto ? "crit" : v >= u.psi_moderado ? "serious" : v >= u.psi_moderado/2 ? "warn" : "good"; }
+const NIVEL_TXT = {good:"Estable", warn:"Leve", serious:"Moderado", crit:"Alto"};
+const NIVEL_ICO = {good:"✓", warn:"•", serious:"▲", crit:"■"};
+
+// ---------------------------------------------------------------- tablas
+function tabla(cont, cols, rows, opts){
+  opts = opts || {}; cont.innerHTML = "";
+  if (!rows.length){ cont.appendChild(h("div",{class:"empty"},"Sin datos")); return; }
+  const t = h("table"); const th = h("thead"); const tr = h("tr");
+  let sortK = null, sortD = 1;
+  cols.forEach(c => { const x = h("th", c.l ? {class:"l"} : {}, esc(c.t)); x.onclick = () => { sortD = sortK === c.k ? -sortD : -1; sortK = c.k; body(); }; tr.appendChild(x); });
+  th.appendChild(tr); t.appendChild(th); const tb = h("tbody"); t.appendChild(tb); cont.appendChild(t);
+  function body(){
+    let rs = rows.slice();
+    if (sortK) rs.sort((a,b) => { const x = a[sortK], y = b[sortK]; if (x == null) return 1; if (y == null) return -1; return (x > y ? 1 : x < y ? -1 : 0) * sortD; });
+    tb.innerHTML = "";
+    rs.slice(0, opts.max || 5000).forEach(r => { const tr = h("tr"); cols.forEach(c => { const v = r[c.k]; const td = h("td", c.l ? {class:"l"} : {}); td.innerHTML = c.f ? c.f(v, r) : esc(fmt(v)); tr.appendChild(td); }); if (opts.onclick) { tr.style.cursor = "pointer"; tr.onclick = () => opts.onclick(r); } tb.appendChild(tr); });
+  }
+  body();
+}
+
+// ---------------------------------------------------------------- ejes / escalas
+function lin(d0, d1, r0, r1){ const s = v => r0 + (v - d0) / ((d1 - d0) || 1) * (r1 - r0); s.d = [d0, d1]; return s; }
+function ticks(a, b, n){ if (a === b){ a -= 1; b += 1; } const span = b - a, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0))); const err = step0 / mag; const step = mag * (err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1); const out = []; for (let v = Math.ceil(a/step)*step; v <= b + 1e-9*step; v += step) out.push(+v.toPrecision(12)); return out; }
+function nice(a, b){ const t = ticks(a, b, 5); const st = t.length > 1 ? t[1]-t[0] : 1; return [Math.min(a, Math.floor(a/st)*st), Math.max(b, Math.ceil(b/st)*st)]; }
+function frame(cont, H){ cont.innerHTML = ""; const W = Math.max(320, cont.clientWidth || 600); const svg = el("svg", {width: W, height: H, viewBox: `0 0 ${W} ${H}`}, null); cont.appendChild(svg); return {svg, W, H}; }
+function yAxis(svg, y, x0, x1, fmtf){ const [a,b] = y.d; ticks(a, b, 4).forEach(v => { const yy = y(v); el("line",{x1:x0,x2:x1,y1:yy,y2:yy,class:"gr"},svg); const t = el("text",{x:x0-6,y:yy+3.5,"text-anchor":"end"},svg); t.textContent = fmtf ? fmtf(v) : fmt(v); }); }
+function xLabels(svg, xs, labels, y0){ const n = xs.length; if (!n) return; const minGap = 58; let last = -1e9, lastEl = null;
+  xs.forEach((x, i) => { const esUlt = i === n - 1; if (x - last < minGap) { if (esUlt && lastEl && n > 1) { lastEl.remove(); } else return; } const t = el("text",{x, y: y0 + 15, "text-anchor":"middle"}, svg); t.textContent = labels[i]; last = x; lastEl = t; }); }
+
+// ---------------------------------------------------------------- gráfico de barras (volumen)
+function chVolumen(){
+  const cont = $("#ch-vol"); const {svg, W, H} = frame(cont, 260); const m = {l:64, r:12, t:10, b:28};
+  const todos = D.rango_periodos; const vm = {}; D.volumen.forEach(r => vm[r.periodo] = r);
+  const mx = Math.max(1, ...D.volumen.map(r => r.n || 0)); const y = lin(0, nice(0, mx)[1], H - m.b, m.t);
+  yAxis(svg, y, m.l, W - m.r);
+  const bw = (W - m.l - m.r) / todos.length; const gap = Math.min(2, bw * 0.15);
+  const xs = todos.map((p, i) => m.l + bw * i + bw/2);
+  todos.forEach((p, i) => {
+    const r = vm[p]; const x = m.l + bw * i + gap/2, w = Math.max(1, bw - gap);
+    if (!r || !r.n){ const g = el("rect",{x, y: H - m.b - 8, width: w, height: 8, rx: 2, fill: css("--crit")}, svg);
+      const hit = el("rect",{x: m.l + bw*i, y: m.t, width: bw, height: H - m.t - m.b, fill:"transparent"}, svg);
+      hit.onmousemove = ev => showTT(ev, `<b>${lab(p)}</b>${ttRow("Filas","0 — hueco")}`); hit.onmouseleave = hideTT; return; }
+    const yy = y(r.n); const hh = H - m.b - yy;
+    el("path",{d: barPath(x, yy, w, hh, Math.min(4, w/2)), fill: css("--s1")}, svg);
+    const hit = el("rect",{x: m.l + bw*i, y: m.t, width: bw, height: H - m.t - m.b, fill:"transparent"}, svg);
+    hit.onmousemove = ev => showTT(ev, `<b>${lab(p)}</b>${ttRow("Filas", fmt(r.n, 0))}${ttRow("Δ vs. anterior", pct(r.var_pct))}${ttRow("z robusto", fmt(r.z_robusto, 2))}`);
+    hit.onmouseleave = hideTT;
+  });
+  el("line",{x1:m.l,x2:W-m.r,y1:H-m.b,y2:H-m.b,class:"ax"},svg);
+  xLabels(svg, xs, todos.map(lab), H - m.b);
+}
+function barPath(x, y, w, hgt, r){ if (hgt <= 0) return ""; r = Math.min(r, hgt); return `M${x},${y+hgt}V${y+r}Q${x},${y} ${x+r},${y}H${x+w-r}Q${x+w},${y} ${x+w},${y+r}V${y+hgt}Z`; }
+
+// ---------------------------------------------------------------- heatmap
+function heatmap(cont, vars, periodos, valor, color, tip, marca, clic){
+  const go = clic === undefined ? irVariable : clic;
+  cont.innerHTML = ""; if (!vars.length){ cont.appendChild(h("div",{class:"empty"},"Sin datos")); return; }
+  const lw = Math.min(260, 14 + 6.6 * Math.max(...vars.map(v => v.length)));
+  const W0 = Math.max(320, cont.clientWidth || 600); const cw = Math.max(16, Math.min(46, (W0 - lw - 10) / periodos.length)); const ch = 18;
+  const W = lw + cw * periodos.length + 10, H = 34 + ch * vars.length;
+  const svg = el("svg",{width: W, height: H}, cont);
+  const step = Math.max(1, Math.ceil(58 / cw));
+  periodos.forEach((p, j) => { if (j % step) return; const t = el("text",{x: lw + cw*j + cw/2, y: 22, "text-anchor":"middle"}, svg); t.textContent = lab(p); });
+  vars.forEach((v, i) => {
+    const y = 30 + i * ch; const t = el("text",{x: lw - 8, y: y + ch/2 + 4, "text-anchor":"end", class:"vn", style:"fill:var(--text)"}, svg); t.textContent = v;
+    if (go) t.onclick = () => go(v); else t.setAttribute("class", "");
+    periodos.forEach((p, j) => {
+      const val = valor(v, p); const x = lw + cw * j;
+      const r = el("rect",{x: x + 1, y: y + 1, width: cw - 2, height: ch - 2, rx: 3, fill: color(val)}, svg);
+      if (marca && marca(v, p)) { const c = el("circle",{cx: x + cw/2, cy: y + ch/2, r: 2.6, fill: css("--surface"), stroke: css("--text"), "stroke-width": 1}, svg); c.style.pointerEvents = "none"; }
+      r.onmousemove = ev => showTT(ev, tip(v, p, val)); r.onmouseleave = hideTT; if (go) { r.style.cursor = "pointer"; r.onclick = () => go(v); }
+    });
+  });
+}
+
+// ---------------------------------------------------------------- PSI
+const PSI_CAMPOS = {anterior: ["psi_anterior", "psi_critico_anterior", "signif_anterior"], alpha: ["psi_alpha", "psi_alpha_critico", "signif_alpha"], base: ["psi_base", "psi_critico_base", "signif_base"]};
+function psiVal(v, p, modo){ const a = (D.psi[v] || []).find(r => r.periodo === p); if (!a) return null; return a[PSI_CAMPOS[modo][0]]; }
+function psiRow(v, p){ return (D.psi[v] || []).find(r => r.periodo === p); }
+function renderPSI(){
+  const modo = $("#psi-modo").value, orden = $("#psi-orden").value; const [kv, kc, ks] = PSI_CAMPOS[modo];
+  let vars = Object.keys(D.psi).filter(v => D.psi[v].some(r => r[kv] != null));
+  const mxv = v => Math.max(-1, ...(D.psi[v]||[]).map(r => r[kv] ?? -1));
+  vars.sort(orden === "max" ? (a,b) => mxv(b) - mxv(a) : (a,b) => a.localeCompare(b));
+  const colf = val => { const n = psiNivel(val); return n ? css("--" + n) : css("--empty"); };
+  const u = D.meta.umbrales;
+  $("#psi-leg").innerHTML = [["good",`&lt; ${u.psi_moderado/2}`],["warn",`${u.psi_moderado/2} – ${u.psi_moderado}`],["serious",`${u.psi_moderado} – ${u.psi_alto}`],["crit",`≥ ${u.psi_alto}`]]
+    .map(([k, t]) => `<span><i class="sw" style="background:var(--${k})"></i>${NIVEL_ICO[k]} ${NIVEL_TXT[k]} (${t})</span>`).join("") + `<span><i class="sw" style="background:var(--empty)"></i>Sin dato / primer periodo</span>`;
+  heatmap($("#hm-psi"), vars, D.periodos, (v, p) => psiVal(v, p, modo), colf,
+    (v, p, val) => { const r = psiRow(v, p) || {}; const n = psiNivel(val);
+      return `<b>${esc(v)}</b> · ${lab(p)}` + (modo === "anterior" && r.periodo_anterior ? ttRow("vs.", lab(r.periodo_anterior)) : "") + `${ttRow("PSI", fmt(val, 4))}${ttRow("Valor crítico", fmt(r[kc], 4))}${ttRow("Significativo", r[ks] == null ? "–" : r[ks] ? "sí" : "no")}${n ? ttRow("Nivel", NIVEL_ICO[n] + " " + NIVEL_TXT[n]) : ""}`; },
+    (v, p) => { const r = psiRow(v, p); return r && r[ks]; });
+  if (!vars.length) $("#hm-psi").innerHTML = '<div class="empty">Sin PSI para esta comparación</div>';
+}
+
+// ---------------------------------------------------------------- nulos
+function renderNulos(){
+  const vars = Object.keys(D.stats).sort((a,b) => { const m = v => Math.max(...D.stats[v].map(r => r.pct_nulos || 0)); return m(b) - m(a) || a.localeCompare(b); });
+  const steps = ["--seq1","--seq2","--seq3","--seq4","--seq5","--seq6","--seq7"];
+  const colf = val => { if (val === null || val === undefined) return css("--empty"); if (val === 0) return css("--surface-2"); const i = Math.min(6, Math.floor(val * 7 - 1e-9)); return css(steps[Math.max(0,i)]); };
+  $("#nul-leg").innerHTML = `<span><i class="sw" style="background:var(--surface-2);border:1px solid var(--border)"></i>0%</span>` + steps.map((s, i) => `<span><i class="sw" style="background:var(${s})"></i>${Math.round(i/7*100)}–${Math.round((i+1)/7*100)}%</span>`).join("");
+  heatmap($("#hm-nul"), vars, D.periodos, (v, p) => { const r = D.stats[v].find(x => x.periodo === p); return r ? r.pct_nulos : null; }, colf,
+    (v, p, val) => { const r = D.stats[v].find(x => x.periodo === p) || {}; return `<b>${esc(v)}</b> · ${lab(p)}${ttRow("% nulos", pct(val, 2))}${ttRow("nulos", fmt(r.n_nulos, 0))}${ttRow("filas", fmt(r.n, 0))}`; });
+}
+
+// ---------------------------------------------------------------- líneas genéricas con crosshair
+function chLineas(cont, periodos, series, opts){
+  opts = opts || {}; const {svg, W, H} = frame(cont, opts.H || 240); const m = {l: 64, r: 14, t: 10, b: 28};
+  let vals = []; series.forEach(s => periodos.forEach(p => { const v = s.f(p); if (v != null && isFinite(v)) vals.push(v); }));
+  (opts.bandas || []).forEach(b => periodos.forEach(p => { [b.lo(p), b.hi(p)].forEach(v => { if (v != null && isFinite(v)) vals.push(v); }); }));
+  (opts.refs || []).forEach(r => vals.push(r.v));
+  if (!vals.length){ cont.innerHTML = '<div class="empty">Sin datos</div>'; return; }
+  let lo = opts.min !== undefined ? opts.min : Math.min(...vals), hi = opts.max !== undefined ? Math.max(opts.max, ...vals) : Math.max(...vals);
+  [lo, hi] = nice(lo, hi); const y = lin(lo, hi, H - m.b, m.t);
+  const x = periodos.length > 1 ? lin(0, periodos.length - 1, m.l + 8, W - m.r - 8) : (() => (m.l + W - m.r)/2);
+  yAxis(svg, y, m.l, W - m.r, opts.yfmt);
+  (opts.bandas || []).forEach(b => { let up = [], dn = []; periodos.forEach((p, i) => { const a = b.lo(p), c = b.hi(p); if (a != null && c != null) { up.push([x(i), y(c)]); dn.unshift([x(i), y(a)]); } });
+    if (up.length) el("path",{d: "M" + up.concat(dn).map(q => q.join(",")).join("L") + "Z", fill: b.color, opacity: 1}, svg); });
+  (opts.refs || []).forEach(r => { el("line",{x1:m.l,x2:W-m.r,y1:y(r.v),y2:y(r.v),stroke:r.color,"stroke-width":1.5,"stroke-dasharray":r.dash||""}, svg); });
+  series.forEach(s => { let d = "", pen = false; periodos.forEach((p, i) => { const v = s.f(p); if (v == null || !isFinite(v)) { pen = false; return; } d += (pen ? "L" : "M") + x(i) + "," + y(v); pen = true; });
+    el("path",{d, fill:"none", stroke: s.color, "stroke-width": 2, "stroke-dasharray": s.dash || "", "stroke-linejoin":"round"}, svg);
+    if (periodos.length <= 40) periodos.forEach((p, i) => { const v = s.f(p); if (v != null && isFinite(v) && !s.dash) el("circle",{cx:x(i),cy:y(v),r:3,fill:s.color,stroke:css("--surface"),"stroke-width":2}, svg); }); });
+  el("line",{x1:m.l,x2:W-m.r,y1:H-m.b,y2:H-m.b,class:"ax"},svg);
+  xLabels(svg, periodos.map((p, i) => x(i)), periodos.map(lab), H - m.b);
+  const cross = el("line",{y1:m.t,y2:H-m.b,stroke:css("--axis"),"stroke-width":1,visibility:"hidden"}, svg);
+  const hit = el("rect",{x:m.l,y:m.t,width:W-m.l-m.r,height:H-m.t-m.b,fill:"transparent"}, svg);
+  hit.onmousemove = ev => { const rc = svg.getBoundingClientRect(); const px = ev.clientX - rc.left; let i = 0, best = 1e9; periodos.forEach((p, k) => { const dd = Math.abs(x(k) - px); if (dd < best){ best = dd; i = k; } });
+    cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility","visible");
+    showTT(ev, `<b>${lab(periodos[i])}</b>` + (opts.tip ? opts.tip(periodos[i]) : series.map(s => ttRow(s.n, (opts.yfmt || fmt)(s.f(periodos[i])))).join(""))); };
+  hit.onmouseleave = () => { cross.setAttribute("visibility","hidden"); hideTT(); };
+}
+
+// ---------------------------------------------------------------- barras PSI por periodo
+function chPSI(v){
+  const cont = $("#ch-psi"); const rows = (D.psi[v] || []).filter(r => r.psi_anterior != null || r.psi_alpha != null);
+  const hayAlpha = rows.some(r => r.psi_alpha != null); $("#leg-alpha").style.display = hayAlpha ? "" : "none";
+  if (!rows.length){ cont.innerHTML = '<div class="empty">Sin PSI (variable sin buckets)</div>'; return; }
+  const per = D.periodos; const u = D.meta.umbrales;
+  const {svg, W, H} = frame(cont, 240); const m = {l: 56, r: 12, t: 10, b: 28};
+  const mx = Math.max(u.psi_alto * 1.15, ...rows.map(r => r.psi_anterior || 0), ...rows.map(r => r.psi_critico_anterior || 0), ...rows.map(r => r.psi_alpha || 0));
+  const y = lin(0, nice(0, mx)[1], H - m.b, m.t); yAxis(svg, y, m.l, W - m.r, v => fmt(v, 2));
+  const bw = (W - m.l - m.r) / per.length;
+  [[u.psi_moderado, "--warn"], [u.psi_alto, "--crit"]].forEach(([val, c]) => el("line",{x1:m.l,x2:W-m.r,y1:y(val),y2:y(val),stroke:css(c),"stroke-width":1.5}, svg));
+  let dCrit = "", dAlpha = "";
+  per.forEach((p, i) => { const r = rows.find(z => z.periodo === p); const x = m.l + bw * i; if (!r) return;
+    const w = Math.max(1, bw - 2);
+    if (r.psi_anterior != null) { const yy = y(r.psi_anterior); el("path",{d: barPath(x + 1, yy, w, H - m.b - yy, Math.min(4, w/2)), fill: css("--s1")}, svg); }
+    if (r.psi_critico_anterior != null) dCrit += (dCrit ? "L" : "M") + (x + 1) + "," + y(r.psi_critico_anterior) + "H" + (x + 1 + w);
+    if (r.psi_alpha != null) dAlpha += (dAlpha ? "L" : "M") + (x + bw/2) + "," + y(r.psi_alpha);
+    const n = psiNivel(r.psi_anterior);
+    const hit = el("rect",{x, y: m.t, width: bw, height: H - m.t - m.b, fill: "transparent"}, svg);
+    hit.onmousemove = ev => showTT(ev, `<b>${lab(p)}</b>` + (r.periodo_anterior ? ttRow("vs.", lab(r.periodo_anterior)) : "") + `${ttRow("PSI vs. anterior", fmt(r.psi_anterior, 4))}${ttRow("Valor crítico", fmt(r.psi_critico_anterior, 4))}${ttRow("Significativo", r.signif_anterior ? "sí" : "no")}` + (r.psi_alpha != null ? ttRow("PSI-α (vs. esperado)", fmt(r.psi_alpha, 4)) : "") + `${n ? ttRow("Nivel", NIVEL_ICO[n] + " " + NIVEL_TXT[n]) : ""}`);
+    hit.onmouseleave = hideTT; });
+  if (dCrit) el("path",{d: dCrit, stroke: css("--text-2"), "stroke-width": 1.5, "stroke-dasharray": "4 3", fill: "none"}, svg).style.pointerEvents = "none";
+  if (dAlpha) el("path",{d: dAlpha, stroke: css("--s2"), "stroke-width": 2, fill: "none"}, svg).style.pointerEvents = "none";
+  el("line",{x1:m.l,x2:W-m.r,y1:H-m.b,y2:H-m.b,class:"ax"},svg);
+  xLabels(svg, per.map((p, i) => m.l + bw * i + bw/2), per.map(lab), H - m.b);
+}
+
+// ---------------------------------------------------------------- barras agrupadas buckets
+function chBins(v){
+  const cont = $("#ch-bins"); const modo = $("#bins-modo").value; const p = +$("#selper").value;
+  let orden, etiquetas, ref, act, refLab;
+  if (modo === "esperado") {
+    const E = (D.esperado || {})[v]; if (!E) { cont.innerHTML = '<div class="empty">Sin distribución esperada para esta variable</div>'; $("#leg-bins").innerHTML = ""; return; }
+    orden = E.orden; etiquetas = E.etiquetas; ref = {}; Object.keys(E.dist).forEach(k => ref[k] = E.dist[k] * 1e6); act = E.counts[p] || {}; refLab = "Esperado (modelo)";
+  } else {
+    const B = D.bins[v]; if (!B){ cont.innerHTML = '<div class="empty">Sin buckets para esta variable</div>'; $("#leg-bins").innerHTML = ""; return; }
+    const prev = D.periodos.filter(x => x < p && B.counts[x]).pop();
+    if (prev === undefined) { cont.innerHTML = '<div class="empty">Es el primer periodo: no hay periodo anterior</div>'; $("#leg-bins").innerHTML = ""; return; }
+    orden = B.orden; etiquetas = B.etiquetas; ref = B.counts[prev] || {}; act = B.counts[p] || {}; refLab = lab(prev);
+  }
+  const tb = Object.values(ref).reduce((a,b) => a + b, 0) || 1, ta = Object.values(act).reduce((a,b) => a + b, 0) || 1;
+  const bins = orden.filter(b => (ref[b] || 0) + (act[b] || 0) > 0);
+  $("#leg-bins").innerHTML = `<span><i class="sw" style="background:var(--s1)"></i>${esc(refLab)}</span><span><i class="sw" style="background:var(--s2)"></i>${lab(p)}</span>`;
+  const rowH = 22, lw = Math.min(200, 12 + 6.4 * Math.max(...bins.map(b => (etiquetas[b] || b).length)));
+  cont.innerHTML = ""; const W = Math.max(320, cont.clientWidth || 600), H = 10 + rowH * bins.length + 22;
+  const svg = el("svg",{width: W, height: H}, cont);
+  const mx = Math.max(...bins.map(b => Math.max((ref[b]||0)/tb, (act[b]||0)/ta)), 0.01);
+  const x = lin(0, nice(0, mx)[1], lw, W - 50);
+  ticks(0, x.d[1], 4).forEach(t => { el("line",{x1:x(t),x2:x(t),y1:6,y2:H-20,class:"gr"},svg); const tx = el("text",{x:x(t),y:H-6,"text-anchor":"middle"},svg); tx.textContent = pct(t, 0); });
+  bins.forEach((b, i) => { const y = 8 + i * rowH; const t = el("text",{x: lw - 8, y: y + rowH/2 + 3, "text-anchor":"end", style:"fill:var(--text)"}, svg); t.textContent = etiquetas[b] || b;
+    const e = (ref[b]||0)/tb, a = (act[b]||0)/ta; const bh = (rowH - 6) / 2;
+    el("rect",{x: lw, y: y + 2, width: Math.max(0, x(e) - lw), height: bh, rx: 2, fill: css("--s1")}, svg);
+    el("rect",{x: lw, y: y + 2 + bh + 2, width: Math.max(0, x(a) - lw), height: bh, rx: 2, fill: css("--s2")}, svg);
+    const hit = el("rect",{x: 0, y, width: W, height: rowH, fill: "transparent"}, svg);
+    const contrib = (Math.max(a,1e-4) - Math.max(e,1e-4)) * Math.log(Math.max(a,1e-4)/Math.max(e,1e-4));
+    hit.onmousemove = ev => showTT(ev, `<b>${esc(etiquetas[b] || b)}</b>${ttRow(refLab, pct(e, 2) + (modo === "esperado" ? "" : " (" + fmt(ref[b]||0, 0) + ")"))}${ttRow(lab(p), pct(a, 2) + " (" + fmt(act[b]||0, 0) + ")")}${ttRow("Aporte al PSI", fmt(contrib, 4))}`);
+    hit.onmouseleave = hideTT; });
+}
+
+
+// ---------------------------------------------------------------- boxplot por periodo
+function chCajas(cont, per, sm, eje){
+  const logScale = eje === "log", acotado = eje === "p99";
+  const filas = per.map(p => sm[p]).filter(r => r && r.p25 != null && r.p75 != null);
+  if (!filas.length){ cont.innerHTML = '<div class="empty">Sin percentiles para esta variable</div>'; return; }
+  const {svg, W, H} = frame(cont, 280); const m = {l: 64, r: 14, t: 12, b: 28};
+  const off = logScale ? Math.max(0, -Math.min(...filas.map(r => r.minimo ?? r.p1 ?? 0))) : 0;  // log10(x + off + 1) admite ceros
+  const T = logScale ? (v => Math.log10(v + off + 1)) : (v => v), Tinv = k => Math.pow(10, k) - off - 1;
+  const caja = r => { const iqr = r.p75 - r.p25; return {lo: Math.max(r.minimo ?? r.p1, r.p25 - 1.5 * iqr), hi: Math.min(r.maximo ?? r.p99, r.p75 + 1.5 * iqr)}; };
+  let vals = []; filas.forEach(r => { const c = caja(r); (acotado ? [r.p1, r.p99, c.lo, c.hi, r.p25, r.p75] : [r.minimo, r.maximo, r.p1, r.p99, r.p25, r.p75]).forEach(v => { if (v != null && isFinite(v)) vals.push(T(v)); }); });
+  let [lo, hi] = [Math.min(...vals), Math.max(...vals)];
+  if (!logScale) [lo, hi] = nice(lo, hi); else { lo = Math.floor(lo); hi = Math.ceil(hi); if (lo === hi) hi = lo + 1; }
+  const vlo = logScale ? Tinv(lo) : lo, vhi = logScale ? Tinv(hi) : hi;
+  const y = lin(lo, hi, H - m.b, m.t);
+  if (logScale) { const ticks = [-off]; for (let k = 1; k <= hi + 1; k++) ticks.push(Math.pow(10, k) - off); ticks.filter(v => T(v) >= lo - 1e-9 && T(v) <= hi + 1e-9).forEach(v => { const yy = y(T(v)); el("line",{x1:m.l,x2:W-m.r,y1:yy,y2:yy,class:"gr"},svg); const t = el("text",{x:m.l-6,y:yy+3.5,"text-anchor":"end"},svg); t.textContent = fmt(v); }); }
+  else yAxis(svg, y, m.l, W - m.r);
+  const bw = (W - m.l - m.r) / per.length, ancho = Math.max(3, Math.min(28, bw * 0.6));
+  const ink = css("--text"), axis = css("--axis"), s1 = css("--s1"), s2 = css("--s2"), fill = css("--band-in"), surf = css("--surface");
+  const Y = v => (v == null || !isFinite(v)) ? null : y(T(Math.min(vhi, Math.max(vlo, v))));
+  const fuera = v => v != null && (v > vhi || v < vlo);
+  const flecha = (cx, v) => { const arriba = v > vhi, yy = arriba ? m.t + 1 : H - m.b - 1, d = arriba ? 7 : -7; el("path",{d:`M${cx-5},${yy+d} L${cx+5},${yy+d} L${cx},${yy} Z`,fill:s2},svg); };
+  per.forEach((p, i) => { const r = sm[p]; if (!r || r.p25 == null) return;
+    const cx = m.l + bw * i + bw / 2, {lo: wlo, hi: whi} = caja(r);
+    const yq1 = Y(r.p25), yq3 = Y(r.p75), ymed = Y(r.p50), ylo = Y(wlo), yhi = Y(whi);
+    if (ylo != null && yhi != null) { el("line",{x1:cx,x2:cx,y1:yhi,y2:yq3,stroke:axis,"stroke-width":1.25},svg); el("line",{x1:cx,x2:cx,y1:yq1,y2:ylo,stroke:axis,"stroke-width":1.25},svg);
+      [ylo, yhi].forEach(yy => el("line",{x1:cx - ancho/4,x2:cx + ancho/4,y1:yy,y2:yy,stroke:axis,"stroke-width":1.25},svg)); }
+    if (yq1 != null && yq3 != null) el("rect",{x:cx - ancho/2,y:yq3,width:ancho,height:Math.max(1, yq1 - yq3),rx:2,fill:fill,stroke:s1,"stroke-width":1.25},svg);
+    if (ymed != null) el("line",{x1:cx - ancho/2,x2:cx + ancho/2,y1:ymed,y2:ymed,stroke:ink,"stroke-width":2},svg);
+    [[r.p1, wlo, false], [r.p99, whi, true]].forEach(([v, w, alto]) => { if (v != null && (alto ? v > w : v < w)) { const yy = Y(v); if (fuera(v)) flecha(cx, v); else if (yy != null) el("circle",{cx,cy:yy,r:3,fill:s2,stroke:surf,"stroke-width":1.5},svg); } });
+    [[r.minimo, wlo, false], [r.maximo, whi, true]].forEach(([v, w, alto]) => { if (v != null && (alto ? v > w : v < w)) { const yy = Y(v); if (fuera(v)) flecha(cx, v); else if (yy != null) el("circle",{cx,cy:yy,r:4,fill:"none",stroke:s2,"stroke-width":2},svg); } });
+    const hit = el("rect",{x: m.l + bw * i, y: m.t, width: bw, height: H - m.t - m.b, fill: "transparent"}, svg);
+    hit.onmousemove = ev => showTT(ev, `<b>${lab(p)}</b>` + [["máx.", r.maximo], ["p99", r.p99], ["p75", r.p75], ["mediana", r.p50], ["p25", r.p25], ["p1", r.p1], ["mín.", r.minimo], ["media", r.media]].map(([k, v]) => ttRow(k, fmt(v))).join("") + ttRow("bigotes", fmt(wlo) + " – " + fmt(whi)) + ttRow("% fuera 1.5·IQR", pct(r.pct_fuera_15, 2)) + ttRow("% fuera 3·IQR", pct(r.pct_fuera_3, 2)));
+    hit.onmouseleave = hideTT; });
+  el("line",{x1:m.l,x2:W-m.r,y1:H-m.b,y2:H-m.b,class:"ax"},svg);
+  xLabels(svg, per.map((p, i) => m.l + bw * i + bw/2), per.map(lab), H - m.b);
+}
+
+// ---------------------------------------------------------------- detalle variable
+function irVariable(v){ $("#selvar").value = v; activar("variable"); renderVariable(); }
+function renderVariable(){
+  if (typeof hideTT === "function") hideTT();
+  const v = $("#selvar").value; const info = D.vars.find(r => r.variable === v) || {};
+  const st = (D.stats[v] || []).slice().sort((a,b) => a.periodo - b.periodo); const sm = {}; st.forEach(r => sm[r.periodo] = r);
+  const per = D.periodos; const ult = st[st.length - 1] || {};
+  $("#var-info").innerHTML = `${esc(info.clase || "")} · <code>${esc(info.tipo_sql || "")}</code>`;
+  const tiles = [["% nulos (último)", pct(ult.pct_nulos, 2)], ["Distintos (último, aprox.)", fmt(ult.ndv, 0)], ["PSI máx. vs. anterior", fmt(info.psi_max, 4)], ["Periodos PSI significativo", fmt(info.periodos_psi_signif, 0)], ["Alertas", fmt(info.alertas, 0)]];
+  if (info.psi_alpha_max != null) tiles.push(["PSI-α máx. (vs. esperado)", fmt(info.psi_alpha_max, 4)]);
+  if (info.clase === "numerica") tiles.splice(2, 0, ["Media (último)", fmt(ult.media)], ["Mediana p50 (último)", fmt(ult.p50)], ["inf/NaN (total)", fmt(info.n_inf_total, 0)], ["% fuera 3·IQR (último)", pct(ult.pct_fuera_3, 2)], ["Asimetría (último)", fmt(ult.asimetria, 2)], ["Curtosis exceso (último)", fmt(ult.curtosis_exceso, 1)]);
+  tiles.unshift(["Recomendación", recPill(info.recomendacion)]);
+  $("#var-tiles").innerHTML = tiles.map(([k, val]) => `<div class="tile"><div class="k">${k}</div><div class="v">${val}</div></div>`).join("");
+  $("#dist-ctrl").style.display = info.clase === "numerica" ? "" : "none"; $("#dist-nota").textContent = "";
+  if (info.clase === "numerica"){
+    if ($("#dist-vista").value === "cajas") {
+      $("#h-dist").textContent = "Distribución por periodo (cajas)";
+      $("#leg-dist").innerHTML = `<span><i class="sw" style="background:var(--band-in);border:1px solid var(--s1)"></i>p25 – p75</span><span><i class="ln" style="border-color:var(--text)"></i>mediana</span><span><i class="ln" style="border-color:var(--axis)"></i>bigotes (1.5·IQR o mín./máx.)</span><span><i class="sw" style="background:var(--s2);border-radius:50%"></i>p1 / p99 fuera del bigote</span><span><i class="sw" style="border:2px solid var(--s2);border-radius:50%"></i>mín. / máx.</span><span style="color:var(--s2)">▲▼</span><span>fuera del eje (ver tooltip)</span>`;
+      chCajas($("#ch-dist"), per, sm, $("#dist-eje").value);
+      $("#dist-nota").textContent = "Cada caja resume un periodo. No hay datos fila a fila: los puntos marcan p1/p99 y el mínimo/máximo cuando quedan fuera de los bigotes. El tooltip da el % fuera de 1.5·IQR y de 3·IQR (cercas del periodo de referencia)." + ($("#dist-eje").value === "p99" ? " Eje acotado a p1–p99 para que se lean las cajas; ▲▼ = mín./máx. fuera del eje. Use \"Completo\" para ver qué tan lejos están." : $("#dist-eje").value === "log" ? " Escala log(1 + x): comprime la cola larga sin ocultar los extremos." : "");
+    } else {
+      $("#h-dist").textContent = "Distribución en el tiempo (percentiles)";
+      $("#leg-dist").innerHTML = `<span><i class="sw" style="background:var(--band-out)"></i>p5 – p95</span><span><i class="sw" style="background:var(--band-in)"></i>p25 – p75</span><span><i class="ln" style="border-color:var(--s1)"></i>p50</span><span><i class="ln" style="border-color:var(--s2);border-top-style:dashed"></i>media</span>`;
+      chLineas($("#ch-dist"), per, [{n:"p50", f: p => sm[p] && sm[p].p50, color: css("--s1")}, {n:"media", f: p => sm[p] && sm[p].media, color: css("--s2"), dash: "5 4"}],
+        {bandas: [{lo: p => sm[p] && sm[p].p5, hi: p => sm[p] && sm[p].p95, color: css("--band-out")}, {lo: p => sm[p] && sm[p].p25, hi: p => sm[p] && sm[p].p75, color: css("--band-in")}],
+         tip: p => { const r = sm[p] || {}; return ["p1","p5","p25","p50","p75","p95","p99"].map(k => ttRow(k, fmt(r[k]))).join("") + ttRow("media", fmt(r.media)) + ttRow("std", fmt(r.std)) + ttRow("min / max", fmt(r.minimo) + " / " + fmt(r.maximo)); }});
+    }
+  } else if (info.clase === "categorica") {
+    $("#h-dist").textContent = "Valores distintos en el tiempo (aprox.)";
+    $("#leg-dist").innerHTML = "";
+    chLineas($("#ch-dist"), per, [{n:"distintos", f: p => sm[p] && sm[p].ndv, color: css("--s1")}], {min: 0});
+  } else {
+    $("#h-dist").textContent = "Rango de fechas";
+    $("#leg-dist").innerHTML = "";
+    $("#ch-dist").innerHTML = '<div class="tw">' + "<table><tr><th>Periodo</th><th>Mín.</th><th>Máx.</th></tr>" + st.map(r => `<tr><td>${lab(r.periodo)}</td><td>${esc(r.min_txt)}</td><td>${esc(r.max_txt)}</td></tr>`).join("") + "</table></div>";
+  }
+  chLineas($("#ch-nul"), per, [{n:"% nulos", f: p => sm[p] && sm[p].pct_nulos, color: css("--s1")}], {min: 0, yfmt: v => pct(v, 1), tip: p => { const r = sm[p] || {}; return ttRow("% nulos", pct(r.pct_nulos, 2)) + ttRow("nulos", fmt(r.n_nulos, 0)) + ttRow("filas", fmt(r.n, 0)); }});
+  chPSI(v);
+  const bm = $("#bins-modo"); const bmCur = bm.value; bm.innerHTML = '<option value="anterior">periodo anterior</option>' + ((D.esperado || {})[v] ? '<option value="esperado">distribución esperada (PSI-α)</option>' : "");
+  bm.value = [...bm.options].some(o => o.value === bmCur) ? bmCur : "anterior";
+  const sel = $("#selper"); const cur = +sel.value; sel.innerHTML = "";
+  const opts = bm.value === "esperado" ? per : per.slice(1); (opts.length ? opts : per).forEach(p => sel.appendChild(h("option",{value:p}, lab(p))));
+  sel.value = opts.includes(cur) ? cur : (opts.length ? opts[opts.length - 1] : per[0]);
+  chBins(v);
+  const cols = [{k:"periodo",t:"Periodo",l:1,f:p => lab(p)},{k:"n",t:"Filas",f:x => fmt(x,0)},{k:"pct_nulos",t:"% nulos",f:x => pct(x,2)},{k:"ndv",t:"Distintos",f:x => fmt(x,0)}];
+  if (info.clase === "numerica") cols.push({k:"pct_inf",t:"% inf",f:x => pct(x,2)},{k:"pct_nan",t:"% NaN",f:x => pct(x,2)},{k:"pct_ceros",t:"% ceros",f:x => pct(x,1)},{k:"pct_negativos",t:"% neg.",f:x => pct(x,1)},{k:"minimo",t:"Mín."},{k:"p1",t:"p1"},{k:"p5",t:"p5"},{k:"p25",t:"p25"},{k:"p50",t:"p50"},{k:"p75",t:"p75"},{k:"p95",t:"p95"},{k:"p99",t:"p99"},{k:"maximo",t:"Máx."},{k:"media",t:"Media"},{k:"std",t:"Desv. est."},{k:"pct_fuera_3",t:"% fuera 3·IQR",f:x => pct(x,2)},{k:"asimetria",t:"Asimetría",f:x => fmt(x,2)},{k:"curtosis_exceso",t:"Curtosis exc.",f:x => fmt(x,1)},{k:"pct_centinela",t:"% centinela",f:x => pct(x,2)});
+  else if (info.clase === "categorica") cols.push({k:"pct_vacios",t:"% vacíos",f:x => pct(x,2)},{k:"n_disfrazados",t:"Disfrazados",f:x => fmt(x,0)},{k:"n_espacios",t:"Con espacios",f:x => fmt(x,0)},{k:"ndv_norm",t:"Distintos norm.",f:x => fmt(x,0)},{k:"long_min",t:"Long. mín."},{k:"long_max",t:"Long. máx."},{k:"min_txt",t:"Mín. (texto)",l:1,f:esc},{k:"max_txt",t:"Máx. (texto)",l:1,f:esc});
+  else cols.push({k:"min_txt",t:"Mín.",l:1,f:esc},{k:"max_txt",t:"Máx.",l:1,f:esc},{k:"n_fecha_futura",t:"Futuras",f:x => fmt(x,0)},{k:"n_fecha_antigua",t:"< 1900",f:x => fmt(x,0)},{k:"n_fecha_centinela",t:"Por defecto",f:x => fmt(x,0)});
+  cols.push({k:"psi",t:"PSI vs. ant.",f:x => fmt(x,4)});
+  if ((D.esperado || {})[v]) cols.push({k:"psia",t:"PSI-α",f:x => fmt(x,4)});
+  tabla($("#tvarstats"), cols, st.map(r => Object.assign({}, r, {psi: psiVal(v, r.periodo, "anterior"), psia: psiVal(v, r.periodo, "alpha")})));
+}
+
+
+// ---------------------------------------------------------------- coherencia
+const recPill = r => { if (!r) return "–"; const c = r === "usar" ? "--good" : r === "revisar" ? "--serious" : r === "llave" ? "--s1" : "--crit"; const ico = r === "usar" ? "✓" : r === "revisar" ? "▲" : r === "llave" ? "⚿" : "■"; return `<span class="pill"><i style="background:var(${c})"></i>${ico} ${esc(r)}</span>`; };
+const SEQ = ["--seq1","--seq2","--seq3","--seq4","--seq5","--seq6","--seq7"];
+function escalaPct(cortes){ return val => { if (val === null || val === undefined || !isFinite(val)) return css("--empty"); if (val === 0) return css("--surface-2"); let i = cortes.findIndex(c => val < c); if (i < 0) i = SEQ.length - 1; return css(SEQ[Math.min(i, SEQ.length - 1)]); }; }
+function leyendaPct(cont, cortes){ const lab2 = v => pct(v, v < 0.01 ? 1 : 0); cont.innerHTML = `<span><i class="sw" style="background:var(--surface-2);border:1px solid var(--border)"></i>0%</span>` + SEQ.map((s, i) => `<span><i class="sw" style="background:var(${s})"></i>${i === 0 ? "&lt; " + lab2(cortes[0]) : i < cortes.length ? lab2(cortes[i-1]) + "–" + lab2(cortes[i]) : "≥ " + lab2(cortes[cortes.length-1])}</span>`).join(""); }
+function renderCoherencia(){
+  const cortes = [0.001, 0.005, 0.01, 0.02, 0.05, 0.1];
+  const vo = Object.keys(D.stats).filter(v => D.stats[v].some(r => r.pct_fuera_3 != null)).sort((a, b) => Math.max(...D.stats[b].map(r => r.pct_fuera_3 || 0)) - Math.max(...D.stats[a].map(r => r.pct_fuera_3 || 0)));
+  leyendaPct($("#out-leg"), cortes);
+  heatmap($("#hm-out"), vo, D.periodos, (v, p) => { const r = D.stats[v].find(x => x.periodo === p); return r ? r.pct_fuera_3 : null; }, escalaPct(cortes),
+    (v, p, val) => { const r = D.stats[v].find(x => x.periodo === p) || {}; return `<b>${esc(v)}</b> · ${lab(p)}${ttRow("% fuera 3·IQR", pct(val, 2))}${ttRow("% fuera 1.5·IQR", pct(r.pct_fuera_15, 2))}${ttRow("Asimetría", fmt(r.asimetria, 2))}${ttRow("Curtosis exceso", fmt(r.curtosis_exceso, 1))}${ttRow("% centinela", pct(r.pct_centinela, 2))}`; });
+  if (!vo.length) $("#hm-out").innerHTML = '<div class="empty">Sin variables numéricas con cercas (base incompleto o IQR = 0)</div>';
+  // reglas
+  const R = D.reglas || []; const porRegla = {};
+  R.forEach(r => { const a = porRegla[r.regla] = porRegla[r.regla] || {regla: r.regla, expresion: r.expresion, n: 0, viol: 0, indet: 0, max: 0, per: 0}; a.n += r.n || 0; a.viol += r.n_violaciones || 0; a.indet += r.n_indeterminado || 0; a.max = Math.max(a.max, r.pct_violaciones || 0); if (r.n_violaciones > 0) a.per += 1; });
+  const filas = Object.values(porRegla).sort((a, b) => b.viol - a.viol);
+  tabla($("#treglas"), [{k:"regla",t:"Regla",l:1,f:esc},{k:"expresion",t:"Expresión SQL (debe ser verdadera)",l:1,f:x => `<code>${esc(x)}</code>`},{k:"viol",t:"Violaciones",f:x => fmt(x,0)},{k:"max",t:"% máx. por periodo",f:x => pct(x,2)},{k:"per",t:"Periodos con violación",f:x => fmt(x,0)},{k:"indet",t:"Indeterminadas (NULL)",f:x => fmt(x,0)}], filas);
+  if (!filas.length) { $("#treglas").innerHTML = '<div class="empty">No se definieron reglas (parámetros reglas / reglas_dominio o static/config.json)</div>'; $("#hm-reglas").innerHTML = ""; $("#reg-leg").innerHTML = ""; }
+  else { leyendaPct($("#reg-leg"), cortes); heatmap($("#hm-reglas"), filas.map(f => f.regla), D.periodos, (v, p) => { const r = R.find(x => x.regla === v && x.periodo === p); return r ? r.pct_violaciones : null; }, escalaPct(cortes),
+    (v, p, val) => { const r = R.find(x => x.regla === v && x.periodo === p) || {}; return `<b>${esc(v)}</b> · ${lab(p)}${ttRow("% violaciones", pct(val, 2))}${ttRow("violaciones", fmt(r.n_violaciones, 0))}${ttRow("filas", fmt(r.n, 0))}`; }, null, null); }
+  // centinelas
+  const C = (D.centinelas || []).map(c => Object.assign({}, c, {pct_max: Math.max(0, ...((D.stats[c.variable] || []).map(r => r.pct_centinela || 0)))}));
+  tabla($("#tcent"), [{k:"variable",t:"Variable",l:1,f:v => `<span class="vn">${esc(v)}</span>`},{k:"valor",t:"Valor",f:x => fmt(x)},{k:"pct_base",t:"% en base",f:x => pct(x,2)},{k:"pct_max",t:"% máx. periodo",f:x => pct(x,2)},{k:"motivo",t:"Motivo",l:1,f:x => x === "patron" ? "patrón de 'sin dato'" : "masa en mínimo/máximo"}], C, {onclick: r => irVariable(r.variable)});
+  if (!C.length) $("#tcent").innerHTML = '<div class="empty">Sin valores centinela detectados ✓</div>';
+  // fechas
+  const F = {}; (D.fechas || []).forEach(r => { const a = F[r.variable] = F[r.variable] || {variable: r.variable, min: r.min_txt, max: r.max_txt, fut: 0, ant: 0, cen: 0}; if (r.min_txt && (!a.min || r.min_txt < a.min)) a.min = r.min_txt; if (r.max_txt && (!a.max || r.max_txt > a.max)) a.max = r.max_txt; a.fut = Math.max(a.fut, r.pct_futura || 0); a.ant = Math.max(a.ant, r.pct_antigua || 0); a.cen = Math.max(a.cen, r.pct_centinela || 0); });
+  tabla($("#tfechas"), [{k:"variable",t:"Variable",l:1,f:v => `<span class="vn">${esc(v)}</span>`},{k:"min",t:"Mín.",l:1,f:esc},{k:"max",t:"Máx.",l:1,f:esc},{k:"fut",t:"% futuras máx.",f:x => pct(x,2)},{k:"ant",t:"% < 1900 máx.",f:x => pct(x,2)},{k:"cen",t:"% por defecto máx.",f:x => pct(x,2)}], Object.values(F), {onclick: r => irVariable(r.variable)});
+  if (!Object.keys(F).length) $("#tfechas").innerHTML = '<div class="empty">Sin columnas de fecha perfiladas</div>';
+  // texto
+  tabla($("#ttexto"), [{k:"variable",t:"Variable",l:1,f:v => `<span class="vn">${esc(v)}</span>`},{k:"pct_disfrazados_max",t:"% disfrazados máx.",f:x => pct(x,2)},{k:"pct_espacios_max",t:"% con espacios máx.",f:x => pct(x,2)},{k:"pct_vacios_max",t:"% vacíos máx.",f:x => pct(x,2)},{k:"pct_castable_num",t:"% convertible a número",f:x => pct(x,1)},{k:"pct_patron_fecha",t:"% con forma de fecha",f:x => pct(x,1)},{k:"ndv_ult",t:"Distintos últ.",f:x => fmt(x,0)},{k:"ndv_norm_ult",t:"Distintos norm. últ.",f:x => fmt(x,0)},{k:"colisiones",t:"Colisiones (base)",l:1,f:x => esc(x || "")}], D.texto || [], {onclick: r => irVariable(r.variable)});
+  if (!(D.texto || []).length) $("#ttexto").innerHTML = '<div class="empty">Sin columnas de texto perfiladas</div>';
+  // cobertura
+  const CO = D.cobertura || []; const cm = {}; CO.forEach(r => cm[r.periodo] = r);
+  if (CO.length) chLineas($("#ch-cob"), D.periodos.filter(p => cm[p]), [{n:"% en anterior", f: p => cm[p].pct_en_anterior, color: css("--s1")}, {n:"% retenidos", f: p => cm[p].pct_retenidos, color: css("--s2")}], {min: 0, max: 1, yfmt: v => pct(v, 0), refs: [{v: D.meta.umbrales.cobertura_min, color: css("--warn"), dash: "4 3"}], tip: p => { const r = cm[p]; return ttRow("vs. periodo", lab(r.periodo_ant)) + ttRow("% del periodo en el anterior", pct(r.pct_en_anterior, 1)) + ttRow("% del anterior que sigue", pct(r.pct_retenidos, 1)) + ttRow("llaves", fmt(r.n_actual, 0)); }});
+  else $("#ch-cob").innerHTML = '<div class="empty">Requiere llave (parámetro llave)</div>';
+  // régimen
+  tabla($("#treg"), [{k:"periodo",t:"Periodo",l:1,f:p => lab(p)},{k:"n_cambian",t:"Variables que cambian",f:x => fmt(x,0)},{k:"n_variables",t:"De",f:x => fmt(x,0)},{k:"pct_cambian",t:"%",f:x => pct(x,0)},{k:"corte_sugerido",t:"Corte sugerido",l:1,f:x => x ? '<span class="pill"><i style="background:var(--serious)"></i>▲ sí</span>' : "no"},{k:"variables",t:"Variables",l:1,f:x => esc(x || "")}], (D.regimen || []).filter(r => r.n_cambian > 0));
+  if (!(D.regimen || []).some(r => r.n_cambian > 0)) $("#treg").innerHTML = '<div class="empty">Sin periodos con cambios simultáneos</div>';
+  // otros
+  tabla($("#totros"), [{k:"variable",t:"Variable",l:1,f:v => `<span class="vn">${esc(v)}</span>`},{k:"pct_otros_base",t:"% OTROS base",f:x => pct(x,1)},{k:"pct_otros_max",t:"% OTROS máx.",f:x => pct(x,1)},{k:"periodo_otros_max",t:"Periodo",l:1,f:p => p ? lab(p) : "–"},{k:"n_categorias_raras_base",t:"Raras (< 1%) en base",f:x => fmt(x,0)},{k:"categorias_raras_base",t:"Cuáles",l:1,f:x => esc(x || "")}], D.otros || [], {onclick: r => irVariable(r.variable)});
+  if (!(D.otros || []).length) $("#totros").innerHTML = '<div class="empty">Sin categóricas con buckets</div>';
+  tabla($("#tident"), [{k:"col_a",t:"Columna",l:1,f:esc},{k:"col_b",t:"Idéntica a",l:1,f:esc}], D.identicas || []);
+  if (!(D.identicas || []).length) $("#tident").innerHTML = '<div class="empty">Sin columnas idénticas ✓</div>';
+}
+
+// ---------------------------------------------------------------- navegación
+const TABS = [["resumen","Resumen"],["volumen","Historia y volumen"],["psi","Estabilidad (PSI)"],["nulos","Nulidad"],["coherencia","Coherencia"],["variable","Detalle de variable"],["ficha","Ficha y vista limpia"],["alertas","Alertas"],["inventario","Inventario"],["ejecucion","Ejecución"]];
+const pintado = {};
+function activar(id){ document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.t === id)); document.querySelectorAll(".tab").forEach(s => s.classList.toggle("on", s.id === "t-" + id)); pintar(id); try { localStorage.setItem("perf_tab", id); } catch(e){} }
+function pintar(id){ ({volumen: chVolumen, psi: renderPSI, nulos: renderNulos, variable: renderVariable, coherencia: renderCoherencia})[id]?.(); pintado[id] = true; }
+const nivelPill = n => { const c = {ALTA:"--crit", MEDIA:"--serious", INFO:"--s1"}[n] || "--muted"; const ico = {ALTA:"■", MEDIA:"▲", INFO:"i"}[n] || ""; return `<span class="pill"><i style="background:var(${c})"></i>${ico} ${n}</span>`; };
+
+function init(){
+  const M = D.meta;
+  $("#titulo").textContent = "Perfilamiento · " + M.tabla;
+  document.title = "Perfilamiento " + M.tabla;
+  if (M.foto) {
+    const li = {}; ((D.lectura || {}).info || []).forEach(x => li[x.k] = x.v);
+    $("#subt").innerHTML = `Archivo <code>${esc(li.archivo || "")}</code>` + (li.hoja ? ` · hoja <code>${esc(li.hoja)}</code>` : "") + ` · <b>foto única</b> (sin campo fecha: estabilidad e historia no aplican) · ejecutado ${esc(M.fecha)} · run <code>${esc(M.run_key)}</code>`;
+  } else $("#subt").innerHTML = (M.origen === "archivo" ? `Archivo · ` : "") + `Campo <code>${esc(M.campo)}</code> (${esc(M.tipo_campo)}, ${esc(M.granularidad)}) · ${esc(M.modo_txt)} · buckets PSI definidos en <b>${lab(M.periodo_base)}</b> · ejecutado ${esc(M.fecha)} · run <code>${esc(M.run_key)}</code>` + (M.filtro_extra ? ` · filtro <code>${esc(M.filtro_extra)}</code>` : "");
+  const nal = k => D.alertas.filter(a => a.nivel === k).length;
+  const tiles = M.foto ? [["Filas", fmt(D.volumen.reduce((a, r) => a + (r.n || 0), 0), 0)], ["Variables", D.vars.length], ["Alertas altas", nal("ALTA")], ["Alertas medias", nal("MEDIA")], ["Para excluir (sugerido)", D.vars.filter(v => (v.recomendacion || "").startsWith("excluir")).length], ["Duración", fmt(M.duracion, 1) + " <small>s</small>"]] : [["Periodos con datos", D.periodos.length + ` <small>de ${D.rango_periodos.length}</small>`], ["Huecos", D.huecos.length], ["Filas totales", fmt(D.volumen.reduce((a, r) => a + (r.n || 0), 0))], ["Variables", D.vars.length], ["Alertas altas", nal("ALTA")], ["Alertas medias", nal("MEDIA")], ["Tareas fallidas", M.n_fallidas + ` <small>de ${M.n_tareas}</small>`], ["Duración", fmt(M.duracion, 0) + " <small>s</small>"]];
+  $("#tiles").innerHTML = tiles.map(([k, v]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+  if (M.foto) { for (let i = TABS.length - 1; i >= 0; i--) if (["volumen", "psi"].includes(TABS[i][0])) TABS.splice(i, 1); }
+  const nav = $("#nav"); TABS.forEach(([id, t]) => { const b = h("button", {"data-t": id}, t); b.onclick = () => activar(id); nav.appendChild(b); });
+
+  // resumen
+  const top = D.alertas.filter(a => a.nivel === "ALTA").slice(0, 12);
+  tabla($("#al-top"), [{k:"nivel",t:"Nivel",l:1,f:nivelPill},{k:"tipo",t:"Tipo",l:1,f:esc},{k:"variable",t:"Variable",l:1,f:esc},{k:"periodo",t:"Periodo",l:1,f:p => p ? lab(p) : "–"},{k:"valor",t:"Valor",f:x => fmt(x, 4)},{k:"detalle",t:"Detalle",l:1,f:esc}], top);
+  if (!top.length) $("#al-top").innerHTML = '<div class="empty">Sin alertas de nivel ALTA ✓</div>';
+  const vcols = [{k:"variable",t:"Variable",l:1,f:v => `<span class="vn">${esc(v)}</span>`},{k:"recomendacion",t:"Recomendación",l:1,f:recPill},{k:"clase",t:"Clase",l:1,f:esc},{k:"tipo_sql",t:"Tipo",l:1,f:esc},{k:"pct_nulos_prom",t:"% nulos prom.",f:x => pct(x,2)},{k:"pct_nulos_ult",t:"% nulos últ.",f:x => pct(x,2)},{k:"n_inf_total",t:"inf/NaN",f:x => fmt(x,0)},{k:"ndv_ult",t:"Distintos últ.",f:x => fmt(x,0)},{k:"min_hist",t:"Mín. hist."},{k:"max_hist",t:"Máx. hist."},{k:"media_ult",t:"Media últ."},{k:"p50_ult",t:"p50 últ."},{k:"psi_max",t:"PSI máx. (vs. ant.)",f:x => { const n = psiNivel(x); return n ? `<span class="pill"><i style="background:var(--${n})"></i>${fmt(x,3)}</span>` : "–"; }},{k:"periodos_psi_signif",t:"Per. PSI signif.",f:x => fmt(x,0)},{k:"psi_alpha_max",t:"PSI-α máx.",f:x => fmt(x,3)},{k:"alertas",t:"Alertas",f:x => fmt(x,0)}];
+  const pintarVars = () => { const q = $("#fvar").value.toLowerCase(); tabla($("#tvars"), vcols, D.vars.filter(r => r.variable.toLowerCase().includes(q)), {onclick: r => irVariable(r.variable)}); };
+  $("#fvar").oninput = pintarVars; pintarVars();
+
+  // volumen
+  tabla($("#tvol"), [{k:"periodo",t:"Periodo",l:1,f:p => lab(p)},{k:"n",t:"Filas",f:x => fmt(x,0)},{k:"var_pct",t:"Δ %",f:x => pct(x,1)},{k:"z_robusto",t:"z robusto",f:x => fmt(x,2)}], D.volumen);
+  tabla($("#tuniq"), [{k:"periodo",t:"Periodo",l:1,f:p => lab(p)},{k:"n",t:"Filas",f:x => fmt(x,0)},{k:"n_distintos",t:"Llaves distintas",f:x => fmt(x,0)},{k:"duplicados",t:"Duplicados",f:x => fmt(x,0)},{k:"pct_duplicados",t:"% dup.",f:x => pct(x,3)}], D.uniq);
+  if (!D.uniq.length) $("#tuniq").innerHTML = '<div class="empty">No se indicó llave</div>';
+  $("#vol-nota").textContent = D.huecos.length ? "Huecos: " + D.huecos.map(lab).join(", ") : "Sin huecos en el rango.";
+
+  // PSI / variable selectors
+  const hayAlpha = Object.values(D.psi).some(rs => rs.some(r => r.psi_alpha != null));
+  $("#psi-modo").innerHTML = '<option value="anterior">vs. periodo anterior</option>' + (hayAlpha ? '<option value="alpha">PSI-α: vs. distribución esperada</option>' : "") + '<option value="base">vs. periodo de referencia de buckets</option>';
+  $("#psi-modo").onchange = renderPSI; $("#psi-orden").onchange = renderPSI;
+  $("#bins-modo").onchange = () => renderVariable();
+  $("#dist-vista").onchange = () => renderVariable(); $("#dist-eje").onchange = () => renderVariable();
+  const sv = $("#selvar"); D.vars.forEach(r => sv.appendChild(h("option", {value: r.variable}, r.variable))); sv.onchange = renderVariable;
+  const vtop = D.vars.slice().sort((a, b) => (b.alertas || 0) - (a.alertas || 0) || (b.psi_max || 0) - (a.psi_max || 0))[0]; if (vtop) sv.value = vtop.variable;
+  $("#selper").onchange = () => chBins($("#selvar").value);
+
+  // alertas
+  const tipos = [...new Set(D.alertas.map(a => a.tipo))].sort(); tipos.forEach(t => $("#al-tipo").appendChild(h("option", {}, t)));
+  const pintarAl = () => { const n = $("#al-nivel").value, t = $("#al-tipo").value; tabla($("#tal"), [{k:"nivel",t:"Nivel",l:1,f:nivelPill},{k:"tipo",t:"Tipo",l:1,f:esc},{k:"variable",t:"Variable",l:1,f:esc},{k:"periodo",t:"Periodo",l:1,f:p => p ? lab(p) : "–"},{k:"valor",t:"Valor",f:x => fmt(x,4)},{k:"umbral",t:"Umbral",f:x => fmt(x,4)},{k:"detalle",t:"Detalle",l:1,f:esc}], D.alertas.filter(a => (!n || a.nivel === n) && (!t || a.tipo === t)), {onclick: r => r.variable && D.stats[r.variable] && irVariable(r.variable)}); };
+  $("#al-nivel").onchange = pintarAl; $("#al-tipo").onchange = pintarAl; pintarAl();
+
+  // inventario
+  tabla($("#tcols"), [{k:"columna",t:"Columna",l:1,f:esc},{k:"tipo",t:"Tipo",l:1,f:esc},{k:"clase",t:"Clase",l:1,f:esc},{k:"rol",t:"Rol",l:1,f:esc}], D.columnas);
+
+  // lectura de archivo
+  if (D.lectura) {
+    $("#c-lectura").style.display = "";
+    tabla($("#tlect"), [{k:"k",t:"Concepto",l:1,f:esc},{k:"v",t:"Valor",l:1,f:esc}], D.lectura.info.concat((D.lectura.hojas || []).map(x => ({k: "hoja: " + x.hoja, v: x.estado}))));
+    tabla($("#tinfer"), [{k:"columna_original",t:"Columna original",l:1,f:esc},{k:"columna",t:"Nombre",l:1,f:esc},{k:"tipo",t:"Tipo",l:1,f:esc},{k:"motivo",t:"Motivo",l:1,f:esc},{k:"no_nulos",t:"No nulos",f:x => fmt(x,0)}], D.lectura.inferencia);
+  }
+
+  // ejecución
+  $("#ej-nota").textContent = M.n_fallidas ? `${M.n_fallidas} tarea(s) fallida(s). Vuelva a ejecutar con los mismos parámetros para reanudar solo lo pendiente.` : "Todas las tareas terminaron correctamente.";
+  tabla($("#ttareas"), [{k:"fase",t:"Fase",l:1,f:esc},{k:"periodo",t:"Periodo",l:1,f:p => lab(p)},{k:"lote",t:"Lote",l:1,f:esc},{k:"estado",t:"Estado",l:1,f:e => e === "ok" ? '<span class="pill"><i style="background:var(--good)"></i>✓ ok</span>' : '<span class="pill"><i style="background:var(--crit)"></i>■ ' + esc(e) + "</span>"},{k:"intentos",t:"Intentos",f:x => fmt(x,0)},{k:"duracion",t:"Seg.",f:x => fmt(x,1)},{k:"error",t:"Error",l:1,f:x => esc((x || "").slice(0, 160))}], D.tareas);
+  tabla($("#tparams"), [{k:"k",t:"Parámetro",l:1,f:esc},{k:"v",t:"Valor",l:1,f:esc}], D.parametros);
+
+  // ficha + vista limpia
+  const fcols = [{k:"variable",t:"Variable",l:1,f:v => `<span class="vn">${esc(v)}</span>`},{k:"clase",t:"Clase",l:1,f:esc},{k:"recomendacion",t:"Recomendación",l:1,f:recPill},{k:"motivos",t:"Motivos",l:1,f:x => esc(x || "")},{k:"pct_nulos_prom",t:"% nulos prom.",f:x => pct(x,2)},{k:"psi_max",t:"PSI máx.",f:x => fmt(x,3)},{k:"pct_fuera_3_max",t:"% fuera 3·IQR máx.",f:x => pct(x,2)},{k:"asimetria_ult",t:"Asimetría últ.",f:x => fmt(x,2)},{k:"ndv_ratio_max",t:"Distintos / no nulos",f:x => pct(x,1)},{k:"alertas",t:"Alertas",f:x => fmt(x,0)}];
+  const pintarFicha = () => { const f = $("#fic-rec").value; tabla($("#tficha"), fcols, D.vars.filter(r => !f || r.recomendacion === f), {onclick: r => irVariable(r.variable)}); };
+  $("#fic-rec").onchange = pintarFicha; pintarFicha();
+  $("#vsql").textContent = D.vista_sql || "-- sin vista";
+  $("#sql-nota").textContent = D.vista_archivo ? "También guardada como " + D.vista_archivo + " junto al reporte." : "";
+  $("#copiar-sql").onclick = () => { const t = D.vista_sql || ""; const ok = () => { $("#copiar-sql").textContent = "Copiado ✓"; setTimeout(() => $("#copiar-sql").textContent = "Copiar SQL", 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, () => {}); else { const ta = h("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); ok(); } catch(e){} ta.remove(); } };
+
+  let ini = "resumen"; try { ini = localStorage.getItem("perf_tab") || ini; } catch(e){}
+  if (!TABS.some(t => t[0] === ini)) ini = "resumen";
+  activar(ini);
+  let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { const on = document.querySelector("nav button.on"); if (on) pintar(on.dataset.t); }, 150); });
+  $("#tema").onclick = () => { const r = document.documentElement; const dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; r.dataset.theme = dark ? "light" : "dark"; const on = document.querySelector("nav button.on"); if (on) pintar(on.dataset.t); };
+}
+init();
+</script>
+</body>
+</html>
